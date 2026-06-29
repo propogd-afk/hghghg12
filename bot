@@ -1,0 +1,283 @@
+import asyncio
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.types import LabeledPrice, PreCheckoutQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.exceptions import TelegramBadRequest
+
+# ==========================================
+# КОНФИГУРАЦИЯ
+# ==========================================
+BOT_TOKEN = "8894625568:AAHhVW19r0UC2DaGVo2n1Wt6Iz0RLNxnDTs"
+ADMIN_ID = 1837883882  
+CARD_REQUISITES = "2200 7021 2064 4385" 
+PROJECT_LINK = "https://t.me/+f9EA7_H-YmlkMGIy"  # Приватный линк на софт
+
+# Юзернейм канала для ОБЯЗАТЕЛЬНОЙ подписки (Обязательно добавь бота в админы этого канала!)
+CHANNEL_USERNAME = "@zifixdlc" 
+
+TARIFS = {
+    "7days": {"title": "Zifix dlc — 7 дней", "rub": 300, "stars": 150},
+    "30days": {"title": "Zifix dlc — 30 дней", "rub": 450, "stars": 250},
+    "90days": {"title": "Zifix dlc — 90 дней", "rub": 520, "stars": 350},
+    "180days": {"title": "Zifix dlc — 180 дней", "rub": 650, "stars": 450},
+}
+
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+
+# ==========================================
+# ФУНКЦИЯ ПРОВЕРКИ ПОДПИСКИ
+# ==========================================
+async def check_subscription(user_id: int) -> bool:
+    """Возвращает True, если юзер подписан, иначе False"""
+    try:
+        member = await bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
+        # Если статус не 'left' (вышел) и не 'kicked' (забанен), значит он в канале
+        if member.status in ["creator", "administrator", "member"]:
+            return True
+        return False
+    except TelegramBadRequest:
+        # Если бот не админ в канале или канала не существует, временно пропускаем, чтобы не поломать бота
+        print(f"⚠️ Ошибка проверки! Проверь, добавлен ли бот в админы канала {CHANNEL_USERNAME}")
+        return True
+    except Exception as e:
+        print(f"Ошибка при проверке подписки: {e}")
+        return True
+
+def get_sub_keyboard():
+    """Клавиатура с требованием подписаться"""
+    buttons = [
+        [InlineKeyboardButton(text="📢 Подписаться на канал", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}")],
+        [InlineKeyboardButton(text="🔄 Проверить подписку", callback_data="sub_check_btn")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_main_keyboard():
+    """Главная клавиатура оплаты"""
+    buttons = [
+        [InlineKeyboardButton(text="⭐ Оплата Telegram Stars", callback_data="method_stars")],
+        [InlineKeyboardButton(text="💳 Перевод на карту РФ", callback_data="method_card")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+# ==========================================
+# 1. ГЛАВНОЕ МЕНЮ И ПРОВЕРКА СТАРТА
+# ==========================================
+
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    """Стартовое меню с проверкой обязательной подписки"""
+    is_subscribed = await check_subscription(message.from_user.id)
+    
+    if not is_subscribed:
+        await message.answer(
+            f"❌ **Доступ ограничен!**\n\n"
+            f"Для использования бота и покупки софта **Zifix dlc**, ты должен быть подписан на наш официальный канал {CHANNEL_USERNAME}.\n\n"
+            f"Подпишись и нажми кнопку проверки ниже 👇",
+            parse_mode="Markdown",
+            reply_markup=get_sub_keyboard()
+        )
+        return
+
+    welcome_text = (
+        "🔥 **Добро пожаловать в ZifixDLC!**\n\n"
+        "📦 Продукт: **Zifix dlc**\n"
+        "📱 Платформа: **Android 11+ (Non-Root / Без рут прав)**\n\n"
+        "Выберите удобный способ оплаты для активации доступа:"
+    )
+    await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+
+
+# Обработка кнопки «🔄 Проверить подписку»
+@dp.callback_query(F.data == "sub_check_btn")
+async def callback_sub_check(callback: types.CallbackQuery):
+    is_subscribed = await check_subscription(callback.from_user.id)
+    
+    if is_subscribed:
+        await callback.answer("✅ Подписка подтверждена!", show_alert=True)
+        welcome_text = (
+            "🔥 **Добро пожаловать в Morozov Market!**\n\n"
+            "📦 Продукт: **Zifix dlc**\n"
+            "📱 Платформа: **Android 11+ (Non-Root / Без рут прав)**\n\n"
+            "Выберите удобный способ оплаты для активации доступа:"
+        )
+        await callback.message.edit_text(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+    else:
+        await callback.answer("❌ Ты всё еще не подписался на канал!", show_alert=True)
+
+
+# ==========================================
+# 2. СЦЕНАРИЙ: TELEGRAM STARS (АВТОМАТ)
+# ==========================================
+
+@dp.callback_query(F.data == "method_stars")
+async def choose_stars_tarif(callback: types.CallbackQuery):
+    buttons = []
+    for key, val in TARIFS.items():
+        buttons.append([InlineKeyboardButton(text=f"⭐ {val['title']} — {val['stars']} XTR", callback_data=f"buy_stars_{key}")])
+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")])
+    
+    await callback.message.edit_text("Выбери тариф для оплаты Звёздами:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+
+@dp.callback_query(F.data.startswith("buy_stars_"))
+async def process_stars_invoice(callback: types.CallbackQuery):
+    tarif_key = callback.data.replace("buy_stars_", "")
+    tarif = TARIFS[tarif_key]
+    
+    await callback.answer()
+    await bot.send_invoice(
+        chat_id=callback.message.chat.id,
+        title=tarif['title'],
+        description="Приватный софт Zifix dlc (Android 11+ Non-Root)",
+        payload=f"stars_{tarif_key}_{callback.from_user.id}",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice(label="Оплата софта", amount=tarif['stars'])]
+    )
+
+@dp.pre_checkout_query()
+async def process_pre_checkout(pre_checkout_query: PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+@dp.message(lambda msg: msg.successful_payment is not None)
+async def process_successful_payment(message: types.Message):
+    payment_info = message.successful_payment
+    
+    buttons = [[InlineKeyboardButton(text="🔗 Войти в группу проекта", url=PROJECT_LINK)]]
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    await message.answer(
+        f"🎉 **Оплата Zifix dlc прошла успешно!**\n"
+        f"Списано: {payment_info.total_amount} XTR.\n\n"
+        f"Твоя подписка активирована. Вступай в группу проекта по кнопке ниже 👇",
+        reply_markup=keyboard
+    )
+
+
+# ==========================================
+# 3. СЦЕНАРИЙ: ПЕРЕВОД НА КАРТУ (РУЧНОЙ)
+# ==========================================
+
+@dp.callback_query(F.data == "method_card")
+async def choose_card_tarif(callback: types.CallbackQuery):
+    buttons = []
+    for key, val in TARIFS.items():
+        buttons.append([InlineKeyboardButton(text=f"💳 {val['title']} — {val['rub']} ₽", callback_data=f"pay_card_{key}")])
+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")])
+    
+    await callback.message.edit_text("Выбери тариф для перевода на карту:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+
+@dp.callback_query(F.data.startswith("pay_card_"))
+async def show_card_requisites(callback: types.CallbackQuery):
+    tarif_key = callback.data.replace("pay_card_", "")
+    tarif = TARIFS[tarif_key]
+    
+    buttons = [
+        [InlineKeyboardButton(text="✅ Я оплатил", callback_data=f"confirm_card_{tarif_key}")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="method_card")]
+    ]
+    
+    text = (
+        f"💳 **Оплата перевода на карту**\n\n"
+        f"Продукт: **Zifix dlc** ({tarif['title'].split('— ')[1]})\n"
+        f"Сумма к переводу: **{tarif['rub']} ₽**\n\n"
+        f"Реквизиты для перевода:\n"
+        f"`{CARD_REQUISITES}`\n\n"
+        f"После перевода обязательно нажми кнопку «Я оплатил»."
+    )
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+
+@dp.callback_query(F.data.startswith("confirm_card_"))
+async def user_confirm_payment(callback: types.CallbackQuery):
+    tarif_key = callback.data.replace("confirm_card_", "")
+    tarif = TARIFS[tarif_key]
+    user = callback.from_user
+    
+    admin_buttons = [
+        [
+            InlineKeyboardButton(text="✅ Активировать", callback_data=f"adm_accept_{user.id}_{tarif_key}"),
+            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"adm_decline_{user.id}")
+        ]
+    ]
+    
+    username_text = f"@{user.username}" if user.username else "Нет юзернейма"
+    
+    await bot.send_message(
+        chat_id=ADMIN_ID,
+        text=f"🔔 <b>Новая заявка на Zifix dlc!</b>\n\n"
+             f"👤 Юзер: {username_text} (ID: <code>{user.id}</code>)\n"
+             f"📦 Тариф: {tarif['title']}\n"
+             f"💰 Сумма: {tarif['rub']} ₽\n"
+             f"Проверь баланс и нажми кнопку ниже.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=admin_buttons)
+    )
+    
+    await callback.message.edit_text(
+        "⌛ Ваша заявка на софт **Zifix dlc** отправлена администратору.\n"
+        "Подписка будет активирована сразу после проверки перевода.\n\n"
+        "Обычно это занимает до 30 минут."
+    )
+
+
+# ==========================================
+# 4. ДЕЙСТВИЯ АДМИНИСТРАТОРА
+# ==========================================
+
+@dp.callback_query(F.data.startswith("adm_accept_"))
+async def admin_accept_payment(callback: types.CallbackQuery):
+    data_parts = callback.data.split("_")
+    user_id = int(data_parts[2])
+    tarif_key = data_parts[3]
+    tarif = TARIFS[tarif_key]
+    
+    user_buttons = [[InlineKeyboardButton(text="🔗 Войти в группу проекта", url=PROJECT_LINK)]]
+    user_keyboard = InlineKeyboardMarkup(inline_keyboard=user_buttons)
+    
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=f"🎉 **Оплата подтверждена!**\n\nВаша подписка на **Zifix dlc** успешно активирована.\n"
+                 f"Переходите по ссылке ниже, чтобы вступить в приватную группу проекта:",
+            reply_markup=user_keyboard,
+            parse_mode="Markdown"
+        )
+        await callback.message.edit_text(f"✅ Доступ к Zifix dlc для пользователя <code>{user_id}</code> успешно открыт. Ссылка отправлена.", parse_mode="HTML")
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Доступ открыт, но не удалось отправить сообщение пользователю: {e}")
+
+@dp.callback_query(F.data.startswith("adm_decline_"))
+async def admin_decline_payment(callback: types.CallbackQuery):
+    user_id = int(callback.data.split("_")[2])
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text="❌ Заявка на оплату отклонена администратором. Если это ошибка, пожалуйста, проверьте чек или свяжитесь с поддержкой."
+        )
+        await callback.message.edit_text(f"❌ Заявка от пользователя <code>{user_id}</code> отклонена.", parse_mode="HTML")
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Не удалось уведомить пользователя об отклонении: {e}")
+
+
+# ==========================================
+# 5. ВСПОМОГАТЕЛЬНЫЕ КНОПКИ
+# ==========================================
+
+@dp.callback_query(F.data == "back_to_main")
+async def back_to_main(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        "🔥 **Добро пожаловать в Morozov Market!**\n\n"
+        "📦 Продукт: **Zifix dlc**\n"
+        "📱 Платформа: **Android 11+ (Non-Root / Без рут прав)**\n\n"
+        "Выберите удобный способ оплаты для активации доступа:",
+        reply_markup=get_main_keyboard(),
+        parse_mode="Markdown"
+    )
+
+async def main():
+    print("Бот Zifix dlc успешно запущен. Обязательная подписка на канал включена!")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
