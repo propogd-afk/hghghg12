@@ -76,9 +76,9 @@ async def cmd_start(message: types.Message):
         return
 
     welcome_text = (
-        "🔥 **Добро пожаловать в Morozov Market!**\n\n"
+        "🔥 **Добро пожаловать в Zifix!**\n\n"
         "📦 Продукт: **Zifix dlc**\n"
-        "⚠️ _Внимание! Чит находится на стадии разработки. Делая покупку, вы оформляете предзаказ!_\n\n"
+        "⚠️ _Внимание! Софт находится на стадии разработки, поэтому некоторые функции могут быть временно не оптимизированы._\n\n"
         "Выберите удобный способ оплаты для активации доступа:"
     )
     await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
