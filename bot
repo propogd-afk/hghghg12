@@ -10,16 +10,17 @@ from aiogram.exceptions import TelegramBadRequest
 BOT_TOKEN = "8894625568:AAHhVW19r0UC2DaGVo2n1Wt6Iz0RLNxnDTs"
 ADMIN_ID = 1837883882  
 CARD_REQUISITES = "2200 7021 2064 4385" 
-PROJECT_LINK = "https://t.me/+f9EA7_H-YmlkMGIy"  # Приватный линк на софт
+PROJECT_LINK = "https://t.me/+f9EA7_H-YmlkMGIy"  
 
-# Юзернейм канала для ОБЯЗАТЕЛЬНОЙ подписки (Обязательно добавь бота в админы этого канала!)
+# Юзернейм канала для ОБЯЗАТЕЛЬНОЙ подписки
 CHANNEL_USERNAME = "@zifixdlc" 
 
+# Тарифы (одинаковые для обеих платформ, но в коде разделяются)
 TARIFS = {
-    "7days": {"title": "Zifix dlc — 7 дней", "rub": 300, "stars": 150},
-    "30days": {"title": "Zifix dlc — 30 дней", "rub": 450, "stars": 250},
-    "90days": {"title": "Zifix dlc — 90 дней", "rub": 520, "stars": 350},
-    "180days": {"title": "Zifix dlc — 180 дней", "rub": 650, "stars": 450},
+    "7days": {"title": "7 дней", "rub": 300, "stars": 150},
+    "30days": {"title": "30 дней", "rub": 450, "stars": 250},
+    "90days": {"title": "90 дней", "rub": 520, "stars": 350},
+    "180days": {"title": "180 дней", "rub": 650, "stars": 450},
 }
 
 bot = Bot(token=BOT_TOKEN)
@@ -29,15 +30,12 @@ dp = Dispatcher()
 # ФУНКЦИЯ ПРОВЕРКИ ПОДПИСКИ
 # ==========================================
 async def check_subscription(user_id: int) -> bool:
-    """Возвращает True, если юзер подписан, иначе False"""
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-        # Если статус не 'left' (вышел) и не 'kicked' (забанен), значит он в канале
         if member.status in ["creator", "administrator", "member"]:
             return True
         return False
     except TelegramBadRequest:
-        # Если бот не админ в канале или канала не существует, временно пропускаем, чтобы не поломать бота
         print(f"⚠️ Ошибка проверки! Проверь, добавлен ли бот в админы канала {CHANNEL_USERNAME}")
         return True
     except Exception as e:
@@ -45,7 +43,6 @@ async def check_subscription(user_id: int) -> bool:
         return True
 
 def get_sub_keyboard():
-    """Клавиатура с требованием подписаться"""
     buttons = [
         [InlineKeyboardButton(text="📢 Подписаться на канал", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}")],
         [InlineKeyboardButton(text="🔄 Проверить подписку", callback_data="sub_check_btn")]
@@ -53,7 +50,6 @@ def get_sub_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_main_keyboard():
-    """Главная клавиатура оплаты"""
     buttons = [
         [InlineKeyboardButton(text="⭐ Оплата Telegram Stars", callback_data="method_stars")],
         [InlineKeyboardButton(text="💳 Перевод на карту РФ", callback_data="method_card")]
@@ -67,7 +63,6 @@ def get_main_keyboard():
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    """Стартовое меню с проверкой обязательной подписки"""
     is_subscribed = await check_subscription(message.from_user.id)
     
     if not is_subscribed:
@@ -81,15 +76,14 @@ async def cmd_start(message: types.Message):
         return
 
     welcome_text = (
-        "🔥 **Добро пожаловать в ZifixDLC!**\n\n"
+        "🔥 **Добро пожаловать в Morozov Market!**\n\n"
         "📦 Продукт: **Zifix dlc**\n"
-        "📱 Платформа: **Android 11+ (Non-Root / Без рут прав)**\n\n"
+        "⚠️ _Внимание! Чит находится на стадии разработки. Делая покупку, вы оформляете предзаказ!_\n\n"
         "Выберите удобный способ оплаты для активации доступа:"
     )
     await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
 
-# Обработка кнопки «🔄 Проверить подписку»
 @dp.callback_query(F.data == "sub_check_btn")
 async def callback_sub_check(callback: types.CallbackQuery):
     is_subscribed = await check_subscription(callback.from_user.id)
@@ -99,7 +93,7 @@ async def callback_sub_check(callback: types.CallbackQuery):
         welcome_text = (
             "🔥 **Добро пожаловать в Morozov Market!**\n\n"
             "📦 Продукт: **Zifix dlc**\n"
-            "📱 Платформа: **Android 11+ (Non-Root / Без рут прав)**\n\n"
+            "⚠️ _Внимание! Чит находится на стадии разработки. Делая покупку, вы оформляете предзаказ!_\n\n"
             "Выберите удобный способ оплаты для активации доступа:"
         )
         await callback.message.edit_text(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
@@ -108,32 +102,79 @@ async def callback_sub_check(callback: types.CallbackQuery):
 
 
 # ==========================================
-# 2. СЦЕНАРИЙ: TELEGRAM STARS (АВТОМАТ)
+# 2. ВЫБОР ПЛАТФОРМЫ
 # ==========================================
 
-@dp.callback_query(F.data == "method_stars")
-async def choose_stars_tarif(callback: types.CallbackQuery):
-    buttons = []
-    for key, val in TARIFS.items():
-        buttons.append([InlineKeyboardButton(text=f"⭐ {val['title']} — {val['stars']} XTR", callback_data=f"buy_stars_{key}")])
-    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")])
+@dp.callback_query(F.data.startswith("method_"))
+async def choose_platform(callback: types.CallbackQuery):
+    method = callback.data.split("_")[1] # "stars" или "card"
     
-    await callback.message.edit_text("Выбери тариф для оплаты Звёздами:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+    buttons = [
+        [InlineKeyboardButton(text="📱 Android 11+ (Non-Root)", callback_data=f"plat_{method}_android")],
+        [InlineKeyboardButton(text="💻 ПК (Эмулятор)", callback_data=f"plat_{method}_pc")], # Изменили здесь текст
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
+    ]
+    
+    await callback.message.edit_text(
+        "🖥 **Выберите вашу платформу:**\n\n"
+        "Укажите устройство, на котором вы будете запускать софт **Zifix dlc**:",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+    )
+    
+    await callback.message.edit_text(
+        "🖥 **Выберите вашу платформу:**\n\n"
+        "Укажите устройство, на котором вы будете использовать софт **Zifix dlc**:",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+    )
+
+
+# ==========================================
+# 3. СЦЕНАРИЙ: ВЫБОР ТАРИФА (ОБНОВЛЕННЫЙ)
+# ==========================================
+
+@dp.callback_query(F.data.startswith("plat_"))
+async def show_tarifs(callback: types.CallbackQuery):
+    data_parts = callback.data.split("_")
+    method = data_parts[1]      # "stars" или "card"
+    platform = data_parts[2]    # "android" или "pc"
+    
+    buttons = []
+    
+    if method == "stars":
+        for key, val in TARIFS.items():
+            buttons.append([InlineKeyboardButton(text=f"⭐ Zifix dlc ({platform.upper()}) — {val['stars']} XTR", callback_data=f"buy_stars_{key}_{platform}")])
+        buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="method_stars")])
+        await callback.message.edit_text("Выбери тариф для оплаты Звёздами:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+        
+    elif method == "card":
+        for key, val in TARIFS.items():
+            buttons.append([InlineKeyboardButton(text=f"💳 Zifix dlc ({platform.upper()}) — {val['rub']} ₽", callback_data=f"pay_card_{key}_{platform}")])
+        buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="method_card")])
+        await callback.message.edit_text("Выбери тариф для перевода на карту:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+
+
+# ==========================================
+# 4. СЦЕНАРИЙ: TELEGRAM STARS (АВТОМАТ)
+# ==========================================
 
 @dp.callback_query(F.data.startswith("buy_stars_"))
 async def process_stars_invoice(callback: types.CallbackQuery):
-    tarif_key = callback.data.replace("buy_stars_", "")
+    data_parts = callback.data.split("_")
+    tarif_key = data_parts[2]
+    platform = data_parts[3]
     tarif = TARIFS[tarif_key]
     
     await callback.answer()
     await bot.send_invoice(
         chat_id=callback.message.chat.id,
-        title=tarif['title'],
-        description="Приватный софт Zifix dlc (Android 11+ Non-Root)",
-        payload=f"stars_{tarif_key}_{callback.from_user.id}",
+        title=f"Zifix dlc — {tarif['title']}",
+        description=f"Приватный софт под платформу: {platform.upper()}",
+        payload=f"stars_{tarif_key}_{platform}_{callback.from_user.id}",
         provider_token="",
         currency="XTR",
-        prices=[LabeledPrice(label="Оплата софта", amount=tarif['stars'])]
+        prices=[LabeledPrice(label=f"Оплата софта ({platform.upper()})", amount=tarif['stars'])]
     )
 
 @dp.pre_checkout_query()
@@ -156,31 +197,25 @@ async def process_successful_payment(message: types.Message):
 
 
 # ==========================================
-# 3. СЦЕНАРИЙ: ПЕРЕВОД НА КАРТУ (РУЧНОЙ)
+# 5. СЦЕНАРИЙ: ПЕРЕВОД НА КАРТУ (РУЧНОЙ)
 # ==========================================
-
-@dp.callback_query(F.data == "method_card")
-async def choose_card_tarif(callback: types.CallbackQuery):
-    buttons = []
-    for key, val in TARIFS.items():
-        buttons.append([InlineKeyboardButton(text=f"💳 {val['title']} — {val['rub']} ₽", callback_data=f"pay_card_{key}")])
-    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")])
-    
-    await callback.message.edit_text("Выбери тариф для перевода на карту:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
 
 @dp.callback_query(F.data.startswith("pay_card_"))
 async def show_card_requisites(callback: types.CallbackQuery):
-    tarif_key = callback.data.replace("pay_card_", "")
+    data_parts = callback.data.split("_")
+    tarif_key = data_parts[2]
+    platform = data_parts[3]
     tarif = TARIFS[tarif_key]
     
     buttons = [
-        [InlineKeyboardButton(text="✅ Я оплатил", callback_data=f"confirm_card_{tarif_key}")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="method_card")]
+        [InlineKeyboardButton(text="✅ Я оплатил", callback_data=f"confirm_card_{tarif_key}_{platform}")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data=f"plat_card_{platform}")]
     ]
     
     text = (
         f"💳 **Оплата перевода на карту**\n\n"
-        f"Продукт: **Zifix dlc** ({tarif['title'].split('— ')[1]})\n"
+        f"Продукт: **Zifix dlc** ({tarif['title']})\n"
+        f"Платформа: **{platform.upper()}**\n"
         f"Сумма к переводу: **{tarif['rub']} ₽**\n\n"
         f"Реквизиты для перевода:\n"
         f"`{CARD_REQUISITES}`\n\n"
@@ -190,13 +225,15 @@ async def show_card_requisites(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("confirm_card_"))
 async def user_confirm_payment(callback: types.CallbackQuery):
-    tarif_key = callback.data.replace("confirm_card_", "")
+    data_parts = callback.data.split("_")
+    tarif_key = data_parts[2]
+    platform = data_parts[3]
     tarif = TARIFS[tarif_key]
     user = callback.from_user
     
     admin_buttons = [
         [
-            InlineKeyboardButton(text="✅ Активировать", callback_data=f"adm_accept_{user.id}_{tarif_key}"),
+            InlineKeyboardButton(text="✅ Активировать", callback_data=f"adm_accept_{user.id}_{tarif_key}_{platform}"),
             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"adm_decline_{user.id}")
         ]
     ]
@@ -207,22 +244,23 @@ async def user_confirm_payment(callback: types.CallbackQuery):
         chat_id=ADMIN_ID,
         text=f"🔔 <b>Новая заявка на Zifix dlc!</b>\n\n"
              f"👤 Юзер: {username_text} (ID: <code>{user.id}</code>)\n"
+             f"🖥 Платформа: <b>{platform.upper()}</b>\n"
              f"📦 Тариф: {tarif['title']}\n"
-             f"💰 Сумма: {tarif['rub']} ₽\n"
+             f"💰 Сумма: {tarif['rub']} ₽\n\n"
              f"Проверь баланс и нажми кнопку ниже.",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=admin_buttons)
     )
     
     await callback.message.edit_text(
-        "⌛ Ваша заявка на софт **Zifix dlc** отправлена администратору.\n"
+        f"⌛ Ваша заявка на софт **Zifix dlc ({platform.upper()})** отправлена администратору.\n"
         "Подписка будет активирована сразу после проверки перевода.\n\n"
         "Обычно это занимает до 30 минут."
     )
 
 
 # ==========================================
-# 4. ДЕЙСТВИЯ АДМИНИСТРАТОРА
+# 6. ДЕЙСТВИЯ АДМИНИСТРАТОРА
 # ==========================================
 
 @dp.callback_query(F.data.startswith("adm_accept_"))
@@ -230,7 +268,7 @@ async def admin_accept_payment(callback: types.CallbackQuery):
     data_parts = callback.data.split("_")
     user_id = int(data_parts[2])
     tarif_key = data_parts[3]
-    tarif = TARIFS[tarif_key]
+    platform = data_parts[4]
     
     user_buttons = [[InlineKeyboardButton(text="🔗 Войти в группу проекта", url=PROJECT_LINK)]]
     user_keyboard = InlineKeyboardMarkup(inline_keyboard=user_buttons)
@@ -238,12 +276,12 @@ async def admin_accept_payment(callback: types.CallbackQuery):
     try:
         await bot.send_message(
             chat_id=user_id,
-            text=f"🎉 **Оплата подтверждена!**\n\nВаша подписка на **Zifix dlc** успешно активирована.\n"
+            text=f"🎉 **Оплата подтверждена!**\n\nВаша подписка на **Zifix dlc ({platform.upper()})** успешно активирована.\n"
                  f"Переходите по ссылке ниже, чтобы вступить в приватную группу проекта:",
             reply_markup=user_keyboard,
             parse_mode="Markdown"
         )
-        await callback.message.edit_text(f"✅ Доступ к Zifix dlc для пользователя <code>{user_id}</code> успешно открыт. Ссылка отправлена.", parse_mode="HTML")
+        await callback.message.edit_text(f"✅ Доступ к Zifix dlc ({platform.upper()}) для пользователя <code>{user_id}</code> успешно открыт. Ссылка отправлена.", parse_mode="HTML")
     except Exception as e:
         await callback.message.edit_text(f"❌ Доступ открыт, но не удалось отправить сообщение пользователю: {e}")
 
@@ -261,22 +299,25 @@ async def admin_decline_payment(callback: types.CallbackQuery):
 
 
 # ==========================================
-# 5. ВСПОМОГАТЕЛЬНЫЕ КНОПКИ
+# 7. ВСПОМОГАТЕЛЬНЫЕ КНОПКИ
 # ==========================================
 
 @dp.callback_query(F.data == "back_to_main")
 async def back_to_main(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        "🔥 **Добро пожаловать в Morozov Market!**\n\n"
+    welcome_text = (
+        "🔥 **Добро пожаловать в Zifix!**\n\n"
         "📦 Продукт: **Zifix dlc**\n"
-        "📱 Платформа: **Android 11+ (Non-Root / Без рут прав)**\n\n"
-        "Выберите удобный способ оплаты для активации доступа:",
+        "⚠️ _Внимание! Чит находится на стадии разработки. Многие функции могут быть не оптимизированы!_\n\n"
+        "Выберите удобный способ оплаты для активации доступа:"
+    )
+    await callback.message.edit_text(
+        welcome_text,
         reply_markup=get_main_keyboard(),
         parse_mode="Markdown"
     )
 
 async def main():
-    print("Бот Zifix dlc успешно запущен. Обязательная подписка на канал включена!")
+    print("Бот Zifix dlc успешно запущен. Разделы ПК/Android активны!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
