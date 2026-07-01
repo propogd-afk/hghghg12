@@ -131,7 +131,7 @@ async def choose_platform(callback: types.CallbackQuery):
 
 
 # ==========================================
-# 3. СЦЕНАРИЙ: ВЫБОР ТАРИФА (ОБНОВЛЕННЫЙ)
+# 3. СЦЕНАРИЙ: ВЫБОР ТАРИФА (ИСПРАВЛЕННЫЙ)
 # ==========================================
 
 @dp.callback_query(F.data.startswith("plat_"))
@@ -142,19 +142,24 @@ async def show_tarifs(callback: types.CallbackQuery):
     
     buttons = []
     
+    # Переводим техническое имя платформы в красивый текст для кнопок
+    platform_label = "ANDROID" if platform == "android" else "ПК"
+    
     if method == "stars":
         for key, val in TARIFS.items():
-            buttons.append([InlineKeyboardButton(text=f"⭐ Zifix dlc ({platform.upper()}) — {val['stars']} XTR", callback_data=f"buy_stars_{key}_{platform}")])
+            # Берём срок из val['title'] (там написано "7 дней", "30 дней" и т.д.)
+            button_text = f"⭐ Zifix dlc ({platform_label}) [{val['title']}] — {val['stars']} XTR"
+            buttons.append([InlineKeyboardButton(text=button_text, callback_data=f"buy_stars_{key}_{platform}")])
         buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="method_stars")])
         await callback.message.edit_text("Выбери тариф для оплаты Звёздами:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
         
     elif method == "card":
         for key, val in TARIFS.items():
-            buttons.append([InlineKeyboardButton(text=f"💳 Zifix dlc ({platform.upper()}) — {val['rub']} ₽", callback_data=f"pay_card_{key}_{platform}")])
+            # Берём срок из val['title'] (там написано "7 дней", "30 дней" и т.д.)
+            button_text = f"💳 Zifix dlc ({platform_label}) [{val['title']}] — {val['rub']} ₽"
+            buttons.append([InlineKeyboardButton(text=button_text, callback_data=f"pay_card_{key}_{platform}")])
         buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="method_card")])
         await callback.message.edit_text("Выбери тариф для перевода на карту:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
-
-
 # ==========================================
 # 4. СЦЕНАРИЙ: TELEGRAM STARS (АВТОМАТ)
 # ==========================================
