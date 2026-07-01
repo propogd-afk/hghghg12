@@ -15,7 +15,6 @@ PROJECT_LINK = "https://t.me/+f9EA7_H-YmlkMGIy"
 # Юзернейм канала для ОБЯЗАТЕЛЬНОЙ подписки
 CHANNEL_USERNAME = "@zifixdlc" 
 
-# Тарифы (одинаковые для обеих платформ, но в коде разделяются)
 TARIFS = {
     "7days": {"title": "7 дней", "rub": 300, "stars": 150},
     "30days": {"title": "30 дней", "rub": 450, "stars": 250},
@@ -78,7 +77,7 @@ async def cmd_start(message: types.Message):
     welcome_text = (
         "🔥 **Добро пожаловать в Zifix!**\n\n"
         "📦 Продукт: **Zifix dlc**\n"
-        "⚠️ _Внимание! Софт находится на стадии разработки, поэтому некоторые функции могут быть временно не оптимизированы._\n\n"
+        "⚠️ **Внимание! Чит находится на стадии разработки. Многие функции могут быть не оптимизированы!**\n\n"
         "Выберите удобный способ оплаты для активации доступа:"
     )
     await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
@@ -93,7 +92,7 @@ async def callback_sub_check(callback: types.CallbackQuery):
         welcome_text = (
             "🔥 **Добро пожаловать в Morozov Market!**\n\n"
             "📦 Продукт: **Zifix dlc**\n"
-            "⚠️ _Внимание! Чит находится на стадии разработки. Делая покупку, вы оформляете предзаказ!_\n\n"
+            "⚠️ **Внимание! Чит находится на стадии разработки. Многие функции могут быть не оптимизированы!**\n\n"
             "Выберите удобный способ оплаты для активации доступа:"
         )
         await callback.message.edit_text(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
@@ -107,11 +106,11 @@ async def callback_sub_check(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("method_"))
 async def choose_platform(callback: types.CallbackQuery):
-    method = callback.data.split("_")[1] # "stars" или "card"
+    method = callback.data.split("_")[1] # "stars" or "card"
     
     buttons = [
         [InlineKeyboardButton(text="📱 Android 11+ (Non-Root)", callback_data=f"plat_{method}_android")],
-        [InlineKeyboardButton(text="💻 ПК (Эмулятор)", callback_data=f"plat_{method}_pc")], # Изменили здесь текст
+        [InlineKeyboardButton(text="💻 ПК (Эмулятор)", callback_data=f"plat_{method}_pc")],
         [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
     ]
     
@@ -121,33 +120,23 @@ async def choose_platform(callback: types.CallbackQuery):
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
     )
-    
-    await callback.message.edit_text(
-        "🖥 **Выберите вашу платформу:**\n\n"
-        "Укажите устройство, на котором вы будете использовать софт **Zifix dlc**:",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
-    )
 
 
 # ==========================================
-# 3. СЦЕНАРИЙ: ВЫБОР ТАРИФА (ИСПРАВЛЕННЫЙ)
+# 3. СЦЕНАРИЙ: ВЫБОР ТАРИФА
 # ==========================================
 
 @dp.callback_query(F.data.startswith("plat_"))
 async def show_tarifs(callback: types.CallbackQuery):
     data_parts = callback.data.split("_")
-    method = data_parts[1]      # "stars" или "card"
-    platform = data_parts[2]    # "android" или "pc"
+    method = data_parts[1]      
+    platform = data_parts[2]    
     
     buttons = []
-    
-    # Переводим техническое имя платформы в красивый текст для кнопок
     platform_label = "ANDROID" if platform == "android" else "ПК"
     
     if method == "stars":
         for key, val in TARIFS.items():
-            # Берём срок из val['title'] (там написано "7 дней", "30 дней" и т.д.)
             button_text = f"⭐ Zifix dlc ({platform_label}) [{val['title']}] — {val['stars']} XTR"
             buttons.append([InlineKeyboardButton(text=button_text, callback_data=f"buy_stars_{key}_{platform}")])
         buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="method_stars")])
@@ -155,11 +144,12 @@ async def show_tarifs(callback: types.CallbackQuery):
         
     elif method == "card":
         for key, val in TARIFS.items():
-            # Берём срок из val['title'] (там написано "7 дней", "30 дней" и т.д.)
             button_text = f"💳 Zifix dlc ({platform_label}) [{val['title']}] — {val['rub']} ₽"
             buttons.append([InlineKeyboardButton(text=button_text, callback_data=f"pay_card_{key}_{platform}")])
         buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="method_card")])
         await callback.message.edit_text("Выбери тариф для перевода на карту:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+
+
 # ==========================================
 # 4. СЦЕНАРИЙ: TELEGRAM STARS (АВТОМАТ)
 # ==========================================
@@ -239,7 +229,7 @@ async def user_confirm_payment(callback: types.CallbackQuery):
     admin_buttons = [
         [
             InlineKeyboardButton(text="✅ Активировать", callback_data=f"adm_accept_{user.id}_{tarif_key}_{platform}"),
-            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"adm_decline_{user.id}")
+            InlineKeyboardButton(text="❌ Отклонить...", callback_data=f"adm_decmenu_{user.id}")
         ]
     ]
     
@@ -265,7 +255,7 @@ async def user_confirm_payment(callback: types.CallbackQuery):
 
 
 # ==========================================
-# 6. ДЕЙСТВИЯ АДМИНИСТРАТОРА
+# 6. ДЕЙСТВИЯ АДМИНИСТРАТОРА (ОБНОВЛЕННЫЙ ВЫБОР ПРИЧИН)
 # ==========================================
 
 @dp.callback_query(F.data.startswith("adm_accept_"))
@@ -290,17 +280,59 @@ async def admin_accept_payment(callback: types.CallbackQuery):
     except Exception as e:
         await callback.message.edit_text(f"❌ Доступ открыт, но не удалось отправить сообщение пользователю: {e}")
 
-@dp.callback_query(F.data.startswith("adm_decline_"))
-async def admin_decline_payment(callback: types.CallbackQuery):
-    user_id = int(callback.data.split("_")[2])
-    try:
-        await bot.send_message(
-            chat_id=user_id,
-            text="❌ Заявка на оплату отклонена администратором. Если это ошибка, пожалуйста, проверьте чек или свяжитесь с поддержкой."
+
+# Вызов меню выбора причины отклонения
+@dp.callback_query(F.data.startswith("adm_decmenu_"))
+async def admin_decline_menu(callback: types.CallbackQuery):
+    user_id = callback.data.split("_")[2]
+    
+    reason_buttons = [
+        [InlineKeyboardButton(text="💸 Не пришли деньги / Нет чека", callback_data=f"adm_reason_{user_id}_money")],
+        [InlineKeyboardButton(text="🛠 Технические причины", callback_data=f"adm_reason_{user_id}_tech")],
+        [InlineKeyboardButton(text="🛑 Нарушение правил / Другое", callback_data=f"adm_reason_{user_id}_other")]
+    ]
+    
+    await callback.message.edit_text(
+        text=f"❓ <b>Выберите причину отклонения заявки для пользователя {user_id}:</b>",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=reason_buttons)
+    )
+
+
+# Обработка выбранной причины и отправка юзеру
+@dp.callback_query(F.data.startswith("adm_reason_"))
+async def admin_send_reason(callback: types.CallbackQuery):
+    data_parts = callback.data.split("_")
+    user_id = int(data_parts[2])
+    reason_type = data_parts[3]
+    
+    # Формируем текст сообщения в зависимости от нажатой кнопки
+    if reason_type == "money":
+        user_message = (
+            "❌ **Ваша заявка на софт Zifix dlc отклонена.**\n\n"
+            "💬 **Причина:** Перевод не был получен администратором либо вы не прикрепили подтверждение. "
+            "Пожалуйста, перепроверьте реквизиты, баланс вашего банка или обратитесь в поддержку, если средства списались."
         )
-        await callback.message.edit_text(f"❌ Заявка от пользователя <code>{user_id}</code> отклонена.", parse_mode="HTML")
+        admin_log = f"❌ Заявка от пользователя <code>{user_id}</code> отклонена. Причина: Не пришли деньги."
+    elif reason_type == "tech":
+        user_message = (
+            "❌ **Ваша заявка на софт Zifix dlc отклонена.**\n\n"
+            "💬 **Причина:** Технические неполадки платежного шлюза или бота. "
+            "Ваши деньги в безопасности. Пожалуйста, попробуйте оформить заявку повторно через несколько минут."
+        )
+        admin_log = f"❌ Заявка от пользователя <code>{user_id}</code> отклонена. Причина: Технические неполадки."
+    else:
+        user_message = (
+            "❌ **Ваша заявка на софт Zifix dlc отклонена.**\n\n"
+            "💬 **Причина:** Отклонено администратором по внутренним причинам проекта или из-за некорректных данных."
+        )
+        admin_log = f"❌ Заявка от пользователя <code>{user_id}</code> отклонена. Причина: Другое."
+
+    try:
+        await bot.send_message(chat_id=user_id, text=user_message, parse_mode="Markdown")
+        await callback.message.edit_text(admin_log, parse_mode="HTML")
     except Exception as e:
-        await callback.message.edit_text(f"❌ Не удалось уведомить пользователя об отклонении: {e}")
+        await callback.message.edit_text(f"❌ Заявка удалена из бота, но не удалось уведомить пользователя (возможно, заблокировал бота): {e}")
 
 
 # ==========================================
@@ -312,7 +344,7 @@ async def back_to_main(callback: types.CallbackQuery):
     welcome_text = (
         "🔥 **Добро пожаловать в Zifix!**\n\n"
         "📦 Продукт: **Zifix dlc**\n"
-        "⚠️ _Внимание! Чит находится на стадии разработки. Многие функции могут быть не оптимизированы!_\n\n"
+        "⚠️ **Внимание! Чит находится на стадии разработки. Многие функции могут быть не оптимизированы!**\n\n"
         "Выберите удобный способ оплаты для активации доступа:"
     )
     await callback.message.edit_text(
@@ -322,7 +354,7 @@ async def back_to_main(callback: types.CallbackQuery):
     )
 
 async def main():
-    print("Бот Zifix dlc успешно запущен. Разделы ПК/Android активны!")
+    print("Бот Zifix dlc успешно запущен. Функционал умного отклонения заявок работает!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
